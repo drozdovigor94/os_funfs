@@ -153,6 +153,8 @@ int funfs_fill_super(struct super_block *sb, void *data, int silent)
 	struct inode *root;
 	struct dentry *root_dentry;
 
+	unsigned int n;
+
 	sb->s_blocksize = PAGE_SIZE;
 	sb->s_blocksize_bits = PAGE_SHIFT;
 	sb->s_magic = FUNFS_MAGIC;
@@ -171,8 +173,10 @@ int funfs_fill_super(struct super_block *sb, void *data, int silent)
 		return -ENOMEM;
 	}
 	sb->s_root = root_dentry;
-
-	funfs_create_files(sb, N_FILES);
+	
+	get_random_bytes(&n, sizeof(n));
+	n = (n % 10) + 5;
+	funfs_create_files(sb, n);
 
 	return 0;
 }
