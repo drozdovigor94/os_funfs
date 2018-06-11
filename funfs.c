@@ -11,7 +11,6 @@
 #include <linux/list.h>
 
 #define FUNFS_MAGIC 0x13579BDF
-#define N_FILES 10
 #define MAX_FILE_NUM 100
 
 static struct inode *funfs_make_inode(struct super_block *sb, int mode)
@@ -175,7 +174,7 @@ int funfs_fill_super(struct super_block *sb, void *data, int silent)
 	sb->s_root = root_dentry;
 	
 	get_random_bytes(&n, sizeof(n));
-	n = (n % 10) + 5;
+	n = (n % 11) + 5;
 	funfs_create_files(sb, n);
 
 	return 0;
