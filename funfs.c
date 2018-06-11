@@ -68,13 +68,13 @@ static struct dentry *funfs_create_file(struct super_block *sb,
 	dentry = d_alloc(dir, &qname);
 	if (!dentry)
 	{
-		printk(KERN_ERR "failed to allocate dentry for file %s\n", name);
+		printk(KERN_ERR "[FUNFS] failed to allocate dentry for file %s\n", name);
 		return NULL;
 	}
 	inode = funfs_make_inode(sb, S_IFREG | 0644);
 	if (!inode)
 	{
-		printk(KERN_ERR "failed to create inode for file %s\n", name);
+		printk(KERN_ERR "[FUNFS] failed to create inode for file %s\n", name);
 		dput(dentry);
 		return NULL;
 	}
