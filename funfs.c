@@ -67,10 +67,14 @@ static struct dentry *funfs_create_file(struct super_block *sb,
 
 	dentry = d_alloc(dir, &qname);
 	if (!dentry)
+	{
+		printk(KERN_ERR "failed to allocate dentry for file %s\n", name);
 		return NULL;
+	}
 	inode = funfs_make_inode(sb, S_IFREG | 0644);
 	if (!inode)
 	{
+		printk(KERN_ERR "failed to create inode for file %s\n", name);
 		dput(dentry);
 		return NULL;
 	}
@@ -84,13 +88,14 @@ static void funfs_create_files(struct super_block *sb, int n)
 	unsigned int x;
 	int i;
 	char filename[20];
+	struct dentry *res;
 	
 	for (i = 0; i < n; i++)
 	{
 		get_random_bytes(&x, sizeof(x));
 		x = (x % MAX_FILE_NUM) + 1;
 		snprintf(filename, 20, "%d", x);
-		funfs_create_file(sb, sb->s_root, filename); 
+		res = funfs_create_file(sb, sb->s_root, filename); 
 	}
 }
 
