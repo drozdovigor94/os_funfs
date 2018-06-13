@@ -54,7 +54,6 @@ static struct file_operations funfs_file_operations = {
 	.write = funfs_write_file,
 };
 
-
 static struct dentry *funfs_create_file(struct super_block *sb, 
 		struct dentry *dir,  const char *name)
 {
@@ -69,13 +68,11 @@ static struct dentry *funfs_create_file(struct super_block *sb,
 	{
 		printk(KERN_INFO "[FUNFS] file %s already exists, skipping\n", name);
 		dput(dentry);
-		// inode_unlock(d_inode(dir));
 		return NULL;
 	}
 	if (IS_ERR(dentry))
 	{
 		printk(KERN_ERR "[FUNFS] failed to allocate dentry for file %s\n", name);
-		// inode_unlock(d_inode(dir));
 		return NULL;
 	}
 	inode = funfs_make_inode(sb, S_IFREG | 0644);
@@ -83,13 +80,11 @@ static struct dentry *funfs_create_file(struct super_block *sb,
 	{
 		printk(KERN_ERR "[FUNFS] failed to create inode for file %s\n", name);
 		dput(dentry);
-		// inode_unlock(d_inode(dir));
 		return NULL;
 	}
 	inode->i_fop = &funfs_file_operations;
 	d_instantiate(dentry, inode);
 	fsnotify_create(d_inode(dentry->d_parent), dentry);
-	// inode_unlock(d_inode(dir));
 	return dentry;
 }
 
