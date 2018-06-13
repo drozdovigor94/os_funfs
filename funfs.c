@@ -9,6 +9,8 @@
 #include <linux/pagemap.h>
 #include <linux/random.h>
 #include <linux/list.h>
+#include <linux/namei.h>
+#include <linux/fsnotify.h>
 
 #define FUNFS_MAGIC 0x13579BDF
 #define MAX_FILE_NUM 100
@@ -19,9 +21,9 @@ static struct inode *funfs_make_inode(struct super_block *sb, int mode)
 
 	if (inode) 
 	{
+		inode->i_ino = get_next_ino();
 		inode->i_mode = mode;
 		inode_init_owner(inode, NULL, mode);
-		inode->i_blocks = 0;
 		inode->i_atime = inode->i_mtime = inode->i_ctime = current_time(inode);
 	}
 	return inode;
@@ -54,20 +56,26 @@ static struct file_operations funfs_file_operations = {
 
 
 static struct dentry *funfs_create_file(struct super_block *sb, 
-		struct dentry *dir, const char *name)
+		struct dentry *dir,  const char *name)
 {
 	struct dentry *dentry;
 	struct inode *inode;
-	struct qstr qname;
 
-	qname.name = name;
-	qname.len = strlen(name);
-	qname.hash = full_name_hash(dir, name, qname.len);
+	printk(KERN_INFO "[FUNFS] Creating file %s\n", name);
 
-	dentry = d_alloc(dir, &qname);
-	if (!dentry)
+	dentry = lookup_one_len(name, dir, strlen(name));
+
+	if (!IS_ERR(dentry) && d_really_is_positive(dentry))
+	{
+		printk(KERN_INFO "[FUNFS] file %s already exists, skipping\n", name);
+		dput(dentry);
+		// inode_unlock(d_inode(dir));
+		return NULL;
+	}
+	if (IS_ERR(dentry))
 	{
 		printk(KERN_ERR "[FUNFS] failed to allocate dentry for file %s\n", name);
+		// inode_unlock(d_inode(dir));
 		return NULL;
 	}
 	inode = funfs_make_inode(sb, S_IFREG | 0644);
@@ -75,26 +83,29 @@ static struct dentry *funfs_create_file(struct super_block *sb,
 	{
 		printk(KERN_ERR "[FUNFS] failed to create inode for file %s\n", name);
 		dput(dentry);
+		// inode_unlock(d_inode(dir));
 		return NULL;
 	}
 	inode->i_fop = &funfs_file_operations;
-	d_add(dentry, inode);
+	d_instantiate(dentry, inode);
+	fsnotify_create(d_inode(dentry->d_parent), dentry);
+	// inode_unlock(d_inode(dir));
 	return dentry;
 }
 
 static void funfs_create_files(struct super_block *sb, int n)
 {
+	
 	unsigned int x;
 	int i;
 	char filename[20];
-	struct dentry *res;
-	
+
 	for (i = 0; i < n; i++)
 	{
 		get_random_bytes(&x, sizeof(x));
 		x = (x % MAX_FILE_NUM) + 1;
 		snprintf(filename, 20, "%d", x);
-		res = funfs_create_file(sb, sb->s_root, filename); 
+		funfs_create_file(sb, sb->s_root, filename);
 	}
 }
 
@@ -104,6 +115,7 @@ static int funfs_unlink(struct inode *dir, struct dentry *dentry)
 	long curnum, rmnum, minnum = LONG_MAX;
 	struct dentry *dentry_iter;
 	struct dentry *parent = dentry->d_parent;
+	int res = 0;
 
 	rmname = dentry->d_name.name;
 	kstrtol(rmname, 10, &rmnum);
@@ -125,15 +137,15 @@ static int funfs_unlink(struct inode *dir, struct dentry *dentry)
 	if (rmnum <= minnum)
 	{
 		printk(KERN_INFO "[FUNFS] Correct file, unlinking\n");
-		d_drop(dentry);
-		return simple_unlink(dir, dentry);
+		res = simple_unlink(dir, dentry);
 	}
 	else
 	{
 		printk(KERN_INFO "[FUNFS] Wrong file, creating 2 new\n");
 		funfs_create_files(dir->i_sb, 2);
-		return -1;
+		res = -1;
 	}
+	return res;
 }
 
 static struct inode_operations funfs_dir_inode_operations = {
@@ -173,9 +185,13 @@ int funfs_fill_super(struct super_block *sb, void *data, int silent)
 	}
 	sb->s_root = root_dentry;
 	
+	
 	get_random_bytes(&n, sizeof(n));
 	n = (n % 11) + 5;
+	
+	inode_lock(d_inode(root_dentry));
 	funfs_create_files(sb, n);
+	inode_unlock(d_inode(root_dentry));
 
 	return 0;
 }
